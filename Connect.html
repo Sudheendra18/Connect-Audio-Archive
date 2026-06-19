@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Connect</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0d0f12; --surface: #161920; --border: #252830;
+      --accent: #5b8ef0; --success: #34d399; --danger: #f87171;
+      --text: #e8eaf0; --muted: #7a7f94;
+      --mono: 'JetBrains Mono', monospace; --sans: 'Inter', sans-serif;
+    }
+    body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; }
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 24px; border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; background: rgba(13,15,18,0.92);
+      backdrop-filter: blur(8px); z-index: 10;
+    }
+    .logo { font-family: var(--mono); font-size: 17px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .logo span { color: var(--accent); }
+    .logo-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    .tab-bar { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 4px; }
+    .tab { padding: 6px 18px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; background: transparent; color: var(--muted); transition: all 0.15s; }
+    .tab.active { background: var(--accent); color: #fff; }
+    .tab:hover:not(.active) { color: var(--text); background: var(--border); }
+    main { max-width: 860px; margin: 0 auto; padding: 32px 20px; }
+    #panel-upload { display: block; } #panel-view { display: none; }
+    .upload-zone {
+      border: 2px dashed var(--border); border-radius: 14px; padding: 48px 24px;
+      text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s; position: relative;
+    }
+    .upload-zone:hover, .upload-zone.drag-over { border-color: var(--accent); background: rgba(91,142,240,0.05); }
+    .upload-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+    .upload-icon { font-size: 40px; margin-bottom: 12px; }
+    .upload-zone h2 { font-size: 18px; margin-bottom: 6px; }
+    .upload-zone p { color: var(--muted); font-size: 13px; }
+    .divider { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; margin: 24px 0; }
+    .divider::before, .divider::after { content:''; flex:1; height:1px; background: var(--border); }
+    .field-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+    label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+    .filename-row { display: flex; gap: 10px; }
+    .filename-row input { flex:1; }
+    .lang-select { width: 130px; }
+    input[type=text], select {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+      padding: 10px 14px; color: var(--text); font-family: var(--sans); font-size: 14px;
+      outline: none; transition: border-color 0.15s; width: 100%;
+    }
+    input[type=text]:focus, select:focus { border-color: var(--accent); }
+    textarea#code-input {
+      width: 100%; min-height: 220px; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 14px; color: var(--text); font-family: var(--mono);
+      font-size: 13px; line-height: 1.6; resize: vertical; outline: none; transition: border-color 0.15s;
+    }
+    textarea#code-input:focus { border-color: var(--accent); }
+    .btn { display: inline-flex; align-items: center; gap: 8px; padding: 11px 22px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: #4a7de8; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-danger { background: transparent; border: 1px solid var(--danger); color: var(--danger); font-size: 12px; padding: 6px 12px; cursor: pointer; border-radius: 6px; }
+    .btn-danger:hover { background: rgba(248,113,113,0.1); }
+    .btn-copy { background: var(--surface); border: 1px solid var(--border); color: var(--muted); font-size: 12px; padding: 6px 12px; cursor: pointer; border-radius: 6px; }
+    .btn-copy:hover { color: var(--text); }
+    .save-row { display: flex; align-items: center; gap: 12px; margin-top: 20px; }
+    #save-status { font-size: 13px; color: var(--success); opacity: 0; transition: opacity 0.3s; }
+    #save-status.show { opacity: 1; }
+    .section-title { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 14px; }
+    .snippet-list { display: flex; flex-direction: column; gap: 10px; }
+    .snippet-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    .card-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; cursor: pointer; gap: 12px; }
+    .card-meta { display: flex; align-items: center; gap: 10px; flex:1; min-width: 0; }
+    .lang-badge { font-family: var(--mono); font-size: 10px; padding: 3px 8px; border-radius: 4px; background: rgba(91,142,240,0.15); color: var(--accent); white-space: nowrap; font-weight: 600; }
+    .card-name { font-family: var(--mono); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .card-time { font-size: 11px; color: var(--muted); white-space: nowrap; margin-left: auto; }
+    .card-actions { display: flex; gap: 6px; align-items: center; }
+    .card-body { display: none; border-top: 1px solid var(--border); }
+    .card-body.open { display: block; }
+    .code-block { padding: 16px; overflow-x: auto; background: #10121a; }
+    .code-block pre { font-family: var(--mono); font-size: 12.5px; line-height: 1.65; color: #c9cfe8; white-space: pre-wrap; word-break: break-all; }
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+    .empty-state .icon { font-size: 36px; margin-bottom: 12px; }
+    .search-row { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; }
+    .search-row input { flex:1; }
+    .count-badge { font-size: 12px; color: var(--muted); background: var(--surface); border: 1px solid var(--border); padding: 4px 12px; border-radius: 20px; white-space: nowrap; }
+    #toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--surface); border: 1px solid var(--border); color: var(--text); font-size: 13px; padding: 10px 20px; border-radius: 24px; transition: transform 0.3s ease; z-index: 100; white-space: nowrap; pointer-events: none; }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+    .loading { text-align: center; padding: 40px; color: var(--muted); font-size: 14px; }
+    .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; margin-right: 8px; vertical-align: middle; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .sync-bar { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); margin-bottom: 16px; }
+    .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+    @media (max-width: 540px) {
+      header { padding: 12px 16px; }
+      .tab { padding: 6px 12px; font-size: 12px; }
+      main { padding: 20px 14px; }
+      .filename-row { flex-direction: column; }
+      .lang-select { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div class="logo"><div class="logo-dot"></div>Connect</div>
+  <div class="tab-bar">
+    <button class="tab active" id="tab-upload" onclick="switchTab('upload')">Upload</button>
+    <button class="tab" id="tab-view" onclick="switchTab('view')">View</button>
+  </div>
+</header>
+<main>
+  <div id="panel-upload">
+    <div class="upload-zone" id="drop-zone">
+      <input type="file" id="file-input" accept="*/*" multiple />
+      <div class="upload-icon">📂</div>
+      <h2>Drop files</h2>
+    </div>
+    <div class="divider">or paste code</div>
+    <div class="field-group">
+      <label>Filename & Language</label>
+      <div class="filename-row">
+        <input type="text" id="fname" placeholder="e.g. utils.py" />
+        <select id="lang" class="lang-select">
+          <option value="auto">Auto-detect</option>
+          <option value="python">Python</option>
+          <option value="javascript">JavaScript</option>
+          <option value="typescript">TypeScript</option>
+          <option value="html">HTML</option>
+          <option value="css">CSS</option>
+          <option value="java">Java</option>
+          <option value="c">C</option>
+          <option value="cpp">C++</option>
+          <option value="rust">Rust</option>
+          <option value="go">Go</option>
+          <option value="sql">SQL</option>
+          <option value="bash">Bash</option>
+          <option value="json">JSON</option>
+          <option value="yaml">YAML</option>
+          <option value="text">Plain text</option>
+        </select>
+      </div>
+    </div>
+    <div class="field-group">
+      <label>Code</label>
+      <textarea id="code-input" placeholder="Paste your code here…"></textarea>
+    </div>
+    <div class="save-row">
+      <button class="btn btn-primary" id="save-btn" onclick="saveSnippet()">☁️ Save to Cloud</button>
+      <span id="save-status">✓ Saved!</span>
+    </div>
+  </div>
+
+  <div id="panel-view">
+    <div class="sync-bar"><div class="sync-dot"></div><span id="sync-label">Synced with GitHub</span></div>
+    <div class="search-row">
+      <input type="text" id="search-input" placeholder="Search by filename or language…" oninput="filterList()" />
+      <span class="count-badge" id="count-badge">0 snippets</span>
+    </div>
+    <p class="section-title">Your code snippets</p>
+    <div id="snippet-list"><div class="loading"><span class="spinner"></span>Loading snippets…</div></div>
+  </div>
+</main>
+<div id="toast"></div>
+
+<script>
+  const TOKEN   = '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';
+  const GIST_ID_KEY = 'cb_gist_id';
+  let GIST_ID = '386303330a7d86c0a9b6f0030a0a82c2';
+  let allSnippets = [];
+
+  const headers = {
+    'Authorization': `token ${TOKEN}`,
+    'Accept': 'application/vnd.github.v3+json',
+    'Content-Type': 'application/json'
+  };
+
+  async function initGist() {
+    if (GIST_ID && GIST_ID !== 'REPLACE_AFTER_FIRST_RUN') return true;
+    try {
+      const res = await fetch('https://api.github.com/gists', {
+        method: 'POST', headers,
+        body: JSON.stringify({
+          description: 'CodeBridge Storage',
+          public: false,
+          files: { 'codebridge.json': { content: JSON.stringify({ snippets: [] }) } }
+        })
+      });
+      const data = await res.json();
+      GIST_ID = data.id;
+      localStorage.setItem(GIST_ID_KEY, GIST_ID);
+      return true;
+    } catch(e) { showToast('⚠️ Could not connect to GitHub'); return false; }
+  }
+
+  async function fetchSnippets() {
+    try {
+      const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers });
+      const data = await res.json();
+      const content = data.files['codebridge.json'].content;
+      return JSON.parse(content).snippets || [];
+    } catch(e) { showToast('⚠️ Failed to load snippets'); return []; }
+  }
+
+  async function pushSnippets(snippets) {
+    await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+      method: 'PATCH', headers,
+      body: JSON.stringify({
+        files: { 'codebridge.json': { content: JSON.stringify({ snippets }) } }
+      })
+    });
+  }
+
+  function switchTab(tab) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+    document.getElementById('panel-upload').style.display = tab === 'upload' ? 'block' : 'none';
+    document.getElementById('panel-view').style.display   = tab === 'view'   ? 'block' : 'none';
+    if (tab === 'view') loadAndRender();
+  }
+
+  async function saveSnippet(nameOverride, codeOverride, langOverride) {
+    const btn = document.getElementById('save-btn');
+    const name = nameOverride || document.getElementById('fname').value.trim() || 'untitled.txt';
+    const code = codeOverride !== undefined ? codeOverride : document.getElementById('code-input').value;
+    const langSel = document.getElementById('lang').value;
+    if (!code.trim()) { showToast('⚠️ Nothing to save'); return; }
+    const lang = langOverride || (langSel === 'auto' ? detectLang(name) : langSel);
+
+    btn.disabled = true; btn.textContent = '⏳ Saving…';
+    try {
+      const snippets = await fetchSnippets();
+      snippets.unshift({ id: Date.now() + Math.random().toString(36).slice(2), name, lang, code, savedAt: new Date().toISOString() });
+      await pushSnippets(snippets);
+      document.getElementById('fname').value = '';
+      document.getElementById('code-input').value = '';
+      document.getElementById('lang').value = 'auto';
+      const s = document.getElementById('save-status');
+      s.classList.add('show'); setTimeout(() => s.classList.remove('show'), 2500);
+      showToast('✓ Saved to GitHub!');
+    } catch(e) { showToast('⚠️ Save failed'); }
+    btn.disabled = false; btn.textContent = '☁️ Save to Cloud';
+  }
+
+  const dropZone = document.getElementById('drop-zone');
+  const fileInput = document.getElementById('file-input');
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); handleFiles(e.dataTransfer.files); });
+  fileInput.addEventListener('change', () => handleFiles(fileInput.files));
+
+  function handleFiles(files) {
+    Array.from(files).forEach(file => {
+      const reader = new FileReader();
+      reader.onload = async e => { await saveSnippet(file.name, e.target.result, detectLang(file.name)); };
+      reader.readAsText(file);
+    });
+  }
+
+  async function loadAndRender() {
+    document.getElementById('snippet-list').innerHTML = '<div class="loading"><span class="spinner"></span>Loading snippets…</div>';
+    document.getElementById('sync-label').textContent = 'Syncing…';
+    allSnippets = await fetchSnippets();
+    document.getElementById('sync-label').textContent = 'Synced with GitHub';
+    filterList();
+  }
+
+  function filterList() {
+    const q = document.getElementById('search-input').value.toLowerCase();
+    const filtered = allSnippets.filter(s => !q || s.name.toLowerCase().includes(q) || s.lang.toLowerCase().includes(q));
+    document.getElementById('count-badge').textContent = `${filtered.length} snippet${filtered.length !== 1 ? 's' : ''}`;
+    const list = document.getElementById('snippet-list');
+    if (!filtered.length) {
+      list.innerHTML = `<div class="empty-state"><div class="icon">📭</div><p>${q ? 'No matches.' : 'No snippets yet. Upload from your phone!'}</p></div>`;
+      return;
+    }
+    list.innerHTML = filtered.map(s => `
+      <div class="snippet-card">
+        <div class="card-header" onclick="toggleCard('${s.id}')">
+          <div class="card-meta">
+            <span class="lang-badge">${s.lang}</span>
+            <span class="card-name">${escHtml(s.name)}</span>
+            <span class="card-time">${timeAgo(s.savedAt)}</span>
+          </div>
+          <div class="card-actions" onclick="event.stopPropagation()">
+            <button class="btn-copy" onclick="copyCode('${s.id}')">Copy</button>
+            <button class="btn btn-danger" onclick="deleteSnippet('${s.id}')">✕</button>
+          </div>
+        </div>
+        <div class="card-body" id="body-${s.id}">
+          <div class="code-block"><pre>${escHtml(s.code)}</pre></div>
+        </div>
+      </div>`).join('');
+  }
+
+  function toggleCard(id) { document.getElementById('body-' + id).classList.toggle('open'); }
+
+  function copyCode(id) {
+    const s = allSnippets.find(x => x.id === id);
+    if (!s) return;
+    navigator.clipboard.writeText(s.code).then(() => showToast('✓ Copied!'));
+  }
+
+  async function deleteSnippet(id) {
+    if (!confirm('Delete this snippet?')) return;
+    allSnippets = allSnippets.filter(s => s.id !== id);
+    await pushSnippets(allSnippets);
+    filterList();
+    showToast('Deleted');
+  }
+
+  function detectLang(fn) {
+    const ext = (fn.split('.').pop() || '').toLowerCase();
+    return {py:'python',js:'javascript',ts:'typescript',jsx:'javascript',tsx:'typescript',html:'html',htm:'html',css:'css',java:'java',c:'c',cpp:'cpp',cc:'cpp',rs:'rust',go:'go',sql:'sql',sh:'bash',bash:'bash',json:'json',yml:'yaml',yaml:'yaml',txt:'text',md:'text'}[ext] || 'text';
+  }
+  function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function timeAgo(iso) {
+    const d = (Date.now() - new Date(iso)) / 1000;
+    if (d < 60) return 'just now';
+    if (d < 3600) return `${Math.floor(d/60)}m ago`;
+    if (d < 86400) return `${Math.floor(d/3600)}h ago`;
+    return `${Math.floor(d/86400)}d ago`;
+  }
+  let toastTimer;
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  // Auto-init gist on first load
+  (async () => {
+    const stored = localStorage.getItem(GIST_ID_KEY);
+    if (stored) { GIST_ID = stored; }
+    else { await initGist(); }
+  })();
+</script>
+</body>
+</html>
+
