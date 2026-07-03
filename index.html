@@ -95,6 +95,7 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     .sync-bar { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); margin-bottom: 16px; }
     .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+    .sync-dot.error { background: var(--danger); }
     @media (max-width: 540px) {
       header { padding: 12px 16px; }
       .tab { padding: 6px 12px; font-size: 12px; }
@@ -155,7 +156,7 @@
   </div>
 
   <div id="panel-view">
-    <div class="sync-bar"><div class="sync-dot"></div><span id="sync-label">Synced with GitHub</span></div>
+    <div class="sync-bar"><div class="sync-dot" id="sync-dot"></div><span id="sync-label">Connecting…</span></div>
     <div class="search-row">
       <input type="text" id="search-input" placeholder="Search by filename or language…" oninput="filterList()" />
       <span class="count-badge" id="count-badge">0 snippets</span>
@@ -169,7 +170,7 @@
 <script>
   const TOKEN   = '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';
   const GIST_ID_KEY = 'connect_gist_id';
-  let GIST_ID = 'REPLACE_AFTER_FIRST_RUN';
+  let GIST_ID = null;
   let allSnippets = [];
 
   const headers = {
@@ -178,8 +179,14 @@
     'Content-Type': 'application/json'
   };
 
-  async function initGist() {
-    if (GIST_ID && GIST_ID !== 'REPLACE_AFTER_FIRST_RUN') return true;
+  // Single shared promise: every function that talks to the Gist API awaits
+  // this first, so nothing fires before GIST_ID is actually known.
+  const readyPromise = (async () => {
+    const stored = localStorage.getItem(GIST_ID_KEY);
+    if (stored) {
+      GIST_ID = stored;
+      return true;
+    }
     try {
       const res = await fetch('https://api.github.com/gists', {
         method: 'POST', headers,
@@ -189,29 +196,59 @@
           files: { 'codebridge.json': { content: JSON.stringify({ snippets: [] }) } }
         })
       });
+      if (!res.ok) throw new Error(`Gist create failed: ${res.status}`);
       const data = await res.json();
       GIST_ID = data.id;
       localStorage.setItem(GIST_ID_KEY, GIST_ID);
       return true;
-    } catch(e) { showToast('⚠️ Could not connect to GitHub'); return false; }
+    } catch (e) {
+      console.error('initGist failed:', e);
+      showToast('⚠️ Could not connect to GitHub');
+      setSyncState(false, 'Connection failed');
+      return false;
+    }
+  })();
+
+  function setSyncState(ok, label) {
+    const dot = document.getElementById('sync-dot');
+    const lbl = document.getElementById('sync-label');
+    if (dot) dot.classList.toggle('error', !ok);
+    if (lbl) lbl.textContent = label;
   }
 
   async function fetchSnippets() {
+    const ok = await readyPromise;
+    if (!ok || !GIST_ID) { showToast('⚠️ Not connected to GitHub'); return []; }
     try {
       const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers });
+      if (!res.ok) throw new Error(`fetch gist failed: ${res.status}`);
       const data = await res.json();
       const content = data.files['codebridge.json'].content;
       return JSON.parse(content).snippets || [];
-    } catch(e) { showToast('⚠️ Failed to load snippets'); return []; }
+    } catch(e) {
+      console.error('fetchSnippets failed:', e);
+      showToast('⚠️ Failed to load snippets');
+      return [];
+    }
   }
 
   async function pushSnippets(snippets) {
-    await fetch(`https://api.github.com/gists/${GIST_ID}`, {
-      method: 'PATCH', headers,
-      body: JSON.stringify({
-        files: { 'codebridge.json': { content: JSON.stringify({ snippets }) } }
-      })
-    });
+    const ok = await readyPromise;
+    if (!ok || !GIST_ID) { showToast('⚠️ Not connected to GitHub'); return false; }
+    try {
+      const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+        method: 'PATCH', headers,
+        body: JSON.stringify({
+          files: { 'codebridge.json': { content: JSON.stringify({ snippets }) } }
+        })
+      });
+      if (!res.ok) throw new Error(`push gist failed: ${res.status}`);
+      return true;
+    } catch(e) {
+      console.error('pushSnippets failed:', e);
+      showToast('⚠️ Save to GitHub failed');
+      return false;
+    }
   }
 
   function switchTab(tab) {
@@ -234,14 +271,19 @@
     try {
       const snippets = await fetchSnippets();
       snippets.unshift({ id: Date.now() + Math.random().toString(36).slice(2), name, lang, code, savedAt: new Date().toISOString() });
-      await pushSnippets(snippets);
-      document.getElementById('fname').value = '';
-      document.getElementById('code-input').value = '';
-      document.getElementById('lang').value = 'auto';
-      const s = document.getElementById('save-status');
-      s.classList.add('show'); setTimeout(() => s.classList.remove('show'), 2500);
-      showToast('✓ Saved to GitHub!');
-    } catch(e) { showToast('⚠️ Save failed'); }
+      const ok = await pushSnippets(snippets);
+      if (ok) {
+        document.getElementById('fname').value = '';
+        document.getElementById('code-input').value = '';
+        document.getElementById('lang').value = 'auto';
+        const s = document.getElementById('save-status');
+        s.classList.add('show'); setTimeout(() => s.classList.remove('show'), 2500);
+        showToast('✓ Saved to GitHub!');
+      }
+    } catch(e) {
+      console.error('saveSnippet failed:', e);
+      showToast('⚠️ Save failed');
+    }
     btn.disabled = false; btn.textContent = '☁️ Save to Cloud';
   }
 
@@ -262,9 +304,9 @@
 
   async function loadAndRender() {
     document.getElementById('snippet-list').innerHTML = '<div class="loading"><span class="spinner"></span>Loading snippets…</div>';
-    document.getElementById('sync-label').textContent = 'Syncing…';
+    setSyncState(true, 'Syncing…');
     allSnippets = await fetchSnippets();
-    document.getElementById('sync-label').textContent = 'Synced with GitHub';
+    setSyncState(true, 'Synced with GitHub');
     filterList();
   }
 
@@ -307,9 +349,8 @@
   async function deleteSnippet(id) {
     if (!confirm('Delete this snippet?')) return;
     allSnippets = allSnippets.filter(s => s.id !== id);
-    await pushSnippets(allSnippets);
-    filterList();
-    showToast('Deleted');
+    const ok = await pushSnippets(allSnippets);
+    if (ok) { filterList(); showToast('Deleted'); }
   }
 
   function detectLang(fn) {
@@ -330,14 +371,6 @@
     t.textContent = msg; t.classList.add('show');
     clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
   }
-
-  // Auto-init gist on first load
-  (async () => {
-    const stored = localStorage.getItem(GIST_ID_KEY);
-    if (stored) { GIST_ID = stored; }
-    else { await initGist(); }
-  })();
 </script>
 </body>
 </html>
-
