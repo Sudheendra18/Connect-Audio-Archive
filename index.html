@@ -169,8 +169,8 @@
 
 <script>
   const TOKEN   = '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';
-  const GIST_ID_KEY = 'connect_gist_id';
-  let GIST_ID = null;
+  // Fixed shared gist — every device points here, so phone and PC read/write the same data.
+  const GIST_ID = 'c891017ba8bee92447136528b5da119f';
   let allSnippets = [];
 
   const headers = {
@@ -179,30 +179,14 @@
     'Content-Type': 'application/json'
   };
 
-  // Single shared promise: every function that talks to the Gist API awaits
-  // this first, so nothing fires before GIST_ID is actually known.
+  // GIST_ID is fixed above, so there's nothing to resolve — just verify it's reachable.
   const readyPromise = (async () => {
-    const stored = localStorage.getItem(GIST_ID_KEY);
-    if (stored) {
-      GIST_ID = stored;
-      return true;
-    }
     try {
-      const res = await fetch('https://api.github.com/gists', {
-        method: 'POST', headers,
-        body: JSON.stringify({
-          description: 'CodeBridge Storage',
-          public: false,
-          files: { 'codebridge.json': { content: JSON.stringify({ snippets: [] }) } }
-        })
-      });
-      if (!res.ok) throw new Error(`Gist create failed: ${res.status}`);
-      const data = await res.json();
-      GIST_ID = data.id;
-      localStorage.setItem(GIST_ID_KEY, GIST_ID);
+      const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers });
+      if (!res.ok) throw new Error(`Gist not reachable: ${res.status}`);
       return true;
     } catch (e) {
-      console.error('initGist failed:', e);
+      console.error('Gist check failed:', e);
       showToast('⚠️ Could not connect to GitHub');
       setSyncState(false, 'Connection failed');
       return false;
