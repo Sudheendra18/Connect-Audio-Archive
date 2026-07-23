@@ -1,0 +1,61 @@
+# ==============================================================================
+# Audio Classifier and Profanity Filter - Python Dependencies
+# ==============================================================================
+
+# --- UI Framework (main.py) --------------------------------------------------
+# Pinned to the version main.py was built and tested against.
+# flet-audio provides the in-app audio player used on the Result screen.
+flet==0.85.3
+flet-audio
+
+# --- Core ---------------------------------------------------------------------
+numpy
+
+# --- Speech Recognition (Whisper) ---------------------------------------------
+# faster-whisper (CTranslate2 backend) is recommended: approximately 4x faster
+# than openai-whisper on CPU, with lower memory usage, int8 quantization, and
+# native word-level timestamps. The real-time filter selects it automatically
+# when installed.
+faster-whisper
+
+# Required unconditionally by audio_pipeline.py (the file-upload pipeline),
+# which imports whisper directly with no fallback. Without this installed,
+# audio_pipeline.py -- and therefore main.py -- will fail to import.
+openai-whisper
+
+# --- Profanity Detection (ML model) --------------------------------------------
+# Wordlist-based detection works without these; required only for the
+# transformer-based toxicity classifier.
+transformers
+torch
+
+# --- Live Audio I/O -------------------------------------------------------------
+# Required for microphone/speaker access in the real-time filter.
+# Not required when using --input file mode.
+sounddevice
+
+# --- Optional Dependencies ------------------------------------------------------
+# silero-vad         Neural voice activity detection (alternative to the
+#                    default energy-based VAD); better performance on noisy
+#                    or music-bed audio.
+# soundfile          Required only for reading non-PCM/compressed audio in
+#                    --input file mode.
+
+# --- File-Upload Pipeline (audio_pipeline.py) -----------------------------------
+librosa
+joblib
+scikit-learn
+pandas
+
+
+# ==============================================================================
+# System Dependencies (not installable via pip)
+# ==============================================================================
+# libportaudio2    Required by sounddevice for microphone/speaker I/O.
+#                  Install via: sudo apt install libportaudio2 (Linux)
+#                               brew install portaudio            (macOS)
+#
+# ffmpeg           Required by Whisper (both backends) to decode audio files.
+#                  Install via: sudo apt install ffmpeg (Linux)
+#                               brew install ffmpeg      (macOS)
+#                  On Windows, ensure ffmpeg is available on the system PATH.
